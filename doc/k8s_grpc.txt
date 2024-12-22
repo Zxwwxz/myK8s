@@ -1,0 +1,1154 @@
+## 第一章
+
+## 第二章 概述
+
+### 2-2 后台技术架构发展史
+
+单体架构-》应用+数据库分离-》数据库主从（延时问题）-》应用分布式（文件同步）-》缓存分布式-》数据库分库分表（水平垂直）-》微服务架构（模块数据独立）-》k8s容器化-》云原生架构
+
+
+
+如何判断主从延时：
+
+1. 从库执行show slave status
+2. Slave_IO_Running和Slave_SQL_Running值为yes
+3. Seconds_Behind_Master，越大延时越严重
+
+
+
+如何搭建分布式文件：
+
+1. 每台机挂载nfs
+2. 配置一样的目录
+3. 引入CDN优化查询
+
+
+
+devops：
+
+code-》CI-》镜像-》CD-》k8s集群
+
+
+
+### 2-4 服务发现和负载均衡
+
+注册中心：
+
+1. 保存管理服务配置信息
+2. 提供注册，查询和健康检查的能力
+3. 本身是分布式系统
+4. 也可以当做一个配置中心
+5. 常用Zookeeper，Etcd，file
+
+
+
+服务发现：
+
+1. 服务端向注册中心注册服务信息
+2. 客户端向注册中心获取服务信息，自己负载均衡后调用服务器
+3. 或者客户端调用网关，网关向注册中心获取服务信息，负载均衡后调用服务器
+
+
+
+负载均衡算法：
+
+1. 轮询和加权轮询
+2. 随机和加权随机
+3. 最小连接
+4. 来源散列
+
+
+
+负载均衡实现方式
+
+1. 客户端
+2. DNS
+3. LVS/Nginx
+4. 中间件代理
+
+
+
+### 2-6 API网关
+
+设计模式：
+
+代理模式，外观模式，中介者模式，责任链模式，策略模式
+
+
+
+功能：
+
+路由，转发，负载均衡
+
+
+
+中间件：
+
+跨域，授权，监控，负载均衡，缓存，熔断，限流，降级，请求分片，静态响应处理
+
+
+
+### 2-7 服务调用治理
+
+治理策略：
+
+1. 超时，客户端主动超时断开
+2. 限流，服务端限制最大并发数
+3. 熔断，错误数达到阈值，客户端不在调用，快速返回，需要恢复熔断
+4. 降级，服务端友好响应，有好过没有
+5. 隔离，隔离不同的调用，互相不影响
+
+
+
+限流算法：
+
+1. 计数器算法
+   1. 设置一个阈值
+   2. 达到阈值，中断请求
+   3. 没达到阈值，计数加1
+   4. 完成请求，计数减1
+   5. 无法应对突发流量
+2. 固定窗口算法
+   1. 设置一个时间段和阈值
+   2. 有请求，增加时段计数，达到阈值，中断请求
+   3. 下一个时间段重置计数
+   4. 时间窗口切换导致可以接受两倍流量
+3. 滑动窗口算法
+   1. 设置时间窗口范围和时间窗口粒度
+   2. 窗口/粒度=同时计数器数量
+   3. 每个计数器按照固定窗口算法计算
+   4. 有请求，需要增加同时存在的每个计数器的计数
+4. 漏桶算法
+   1. 桶有固定容量，类似消息队列
+   2. 所有并发请求进入漏桶
+   3. 时间段内固定数量请求出去漏桶，执行
+   4. 超过桶量的请求，被抛弃
+5. 令牌桶算法
+   1. 固定速率往桶增加令牌
+   2. 如果请求可以得到令牌，执行
+   3. 如果请求不能得到令牌，丢弃
+
+
+
+降级策略：
+
+1. 返回旧值
+2. 切换执行计划B
+3. 返回默认值
+4. 降低质量，不计算耗时逻辑
+5. 补偿，先返回成功，后续补偿
+
+
+
+熔断策略：
+
+1. 需要设置触发条件和恢复条件
+
+
+
+分布式容错库：Hystrix
+
+1. 使用一个对象包装对依赖项的调用
+2. 可以设置线程数的并发资源隔离
+3. 可以设置调用超时时间
+4. 可以设置限流
+5. 可以设置错误率熔断和恢复
+6. 可以设置错误时的回退逻辑
+7. 可以查看实时监控
+
+
+
+### 2-8 微服务框架
+
+1. go-zero
+2. go-micro
+3. kratos
+4. rpcx
+5. kitex
+
+
+
+### 2-9 k8s在微服务方面可做什么
+
+1. 服务发现和服务治理
+2. 通用性更好
+3. 部署效率提升
+
+
+
+## 第三章 grpc
+
+### 3-2 第一个gprc例子
+
+环境准备：
+
+1. 安装go：https://go.dev/
+
+2. 安装protocol buffer：https://grpc.io/docs/protoc-installation/
+
+3. 安装protoc go和go-grpc插件
+
+   1. go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+   2. go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+4. 编译proto
+
+   ```
+   protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative helloworld/helloworld.proto
+   
+       google/api/*.proto 来自 https://github.com/googleapis/googleapis
+       google/protobuf/*.proto 来自 https://github.com/protocolbuffers/protobuf
+   ```
+   
+   
+
+### 3-4 protobuf编解码原理
+
+参考文档：
+
+https://lessisbetter.site/2019/08/26/protobuf-in-go/
+
+https://juejin.cn/post/7175805030191071293
+
+原理：
+
+​	目标：
+
+​		将结构体和二进制互相转换
+
+​	概念：
+
+  		1. field-number：proto文件中自己定义的字段的数字
+  		2. wire-type：编码类型，0-Varint（非ZigZag编码类型：int32, uint32, int64, uint64, bool, enum；ZigZag编码类型：sint32, sint64）；1-64-bits（fixed64, sfixed64, double）；2-Length-delimited（ string, bytes, embedding message, packed repeated fields）；3-32-bits（fixed32, sfixed32, float）
+
+​	编码：
+
+1. 整体编码，一个结构体多个字段，最终转换为：
+
+```
+[tag1][value1][tag2][value2][tag3][value3]
+```
+
+2. tag=(field-number << 3) | wire_type
+3. wire-type=0，非ZigZag；value=1xxxxxxx 0xxxxxxx，1表示后面7位不是最后一个字节，0表示后面7位是最后一个字节，xxxxxxx表示真实数据，小端存储
+4. wire-type=0，ZigZag；value=先ZigZag=(n << 1) ^ (n << k)，负数转为正数，后如上3。
+5. wire-type=1,2,3；value=length + content，length表示字节数，content表示真实数据
+
+
+
+### 3-5 protoc-go插件原理
+
+参考文档：
+
+grpc-go/cmd/protoc-gen-go-grpc
+
+
+
+### 3-6 grpc通讯原理
+
+参考文档：
+
+https://eddycjy.gitbook.io/golang/di-1-ke-za-tan/talking-grpc
+
+https://cloud.tencent.com/developer/article/2336320
+
+
+
+### 3-7 http2原理
+
+1. 二进制分帧
+   1. 消息(message)：一个完整的请求或者响应，由一个或多个 Frame 组成。
+   2. 帧(frame)：类型Type, 长度Length, 标记Flags, 流标识Stream和有效载荷frame payload
+2. 多路复用
+   1. 同时通过单一的http/2 连接发起多重的请求-响应消息
+   2. 每个数据流都拆分成很多互不依赖的帧
+3. 头部压缩
+   1. 使用encoder来减少需要传输的header大小
+4. 服务端推送
+   1. 无需客户端明确地请求
+
+
+
+### 4-2 k8s核心组件
+
+![](.\pic\k8s核心组件.png)
+
+
+
+### 4-3 k8s资源
+
+![](.\pic\k8s资源.png)
+
+![](.\pic\k8s资源2.png)
+
+![](.\pic\k8s资源3.png)
+
+![](.\pic\k8s资源4.png)
+
+### 4-6 API Server
+
+1. 接口服务
+2. 网关功能
+3. 资源对象管理
+
+### 4-7 Controller Manager
+
+1. 保证集群中各种资源的实际状态（status）和用户定义的期望状态（spec）一致
+2. 由负责不同资源的多个 Controller 构成
+3. Controller 保证集群内的资源保持预期状态
+4. Controller Manager 保证了 Controller 保持在预期状态
+
+
+
+工作流程：
+
+![](.\pic\Controller Manager.png)
+
+1. Controller Manager 主要提供了一个分发事件的能力
+2. 不同的 Controller 只需要注册对应的 Handler 来等待接收和处理事件
+
+
+
+架构：
+
+![](.\pic\Controller Manager2.png)
+
+informer功能：
+
+1. 资源数据缓存功能
+2. 提供handler时事件机制，会触发回调Controller
+
+reflector功能：
+
+1. 采用List（短链接全量），Watch（长连接增量）与apiserver交互
+2. 增量对象添加到队列
+
+indexer模块：
+
+1. 保存数据到本地缓存
+2. 从本地缓存获取数据
+
+### 4-8 Scheduler
+
+1. 将pod放置在合适的节点
+2. 过滤，打分，绑定
+3. 考虑因素：单独和整体的资源请求、硬件/软件/策略限制、亲和以及反亲和要求、数据局部性、负载间的干扰
+
+
+
+工作流程：
+
+![](.\pic\Scheduler.png)
+
+1. Watch新建pod的事件
+2. 过滤出满足资源调度需求的所有可调度节点
+3. 对这些节点打分，把得分最高的节点找出来
+4. 选择得分最高的一个节点
+5. 把这个节点信息写入新建pod消息中，保存到api-server
+6. 调度：确保pod匹配到合适的节点
+7. 抢占：终止低优先级的pod，以便高优先级的pod可以调度
+8. 驱逐：在资源匮乏的节点上，主动让一个或者多个pod失效
+
+
+
+scheduler framework
+
+![](.\pic\Scheduler_Framework.png)
+
+调度周期（串行），绑定周期（并行）
+
+
+
+### 4-8 Kubectl
+
+1. 上报 Node 节点信息
+2. 管理Pod，包括创建、销毁Pod
+
+
+
+j架构：
+
+![](.\pic\Kubectl.png)
+
+1. PLEG组件：Pod生命周期事件生成器，维护着Pod缓存，定期通过容器运行时获取Pod的信息，与缓存中的信息比较，生成相应的事件
+2. PodWorkers：处理事件中Pod的信息同步，记录Pod从pending到running的耗时，杀掉不应该运行的pod，使用VolumeManager为Pod挂载卷
+3. PodManager：存储Pod的期望状态
+4. StatsProvider：提供节点和容器的统计信息
+5. ContainerRuntime：遵循CRI规范的高级容器运行时进行交互
+6. SyncLoop：接受来自PodConfig的Pod变更通知、定时任务、PLEG的事件，将Pod同步到期望状态
+7. PluginManager：此节点确定哪些插件需要注册、取消注册并执行
+
+工作原理：
+
+![](.\pic\Kubectl2.png)
+
+事件来源：
+
+1. PodConfig的更新事件
+2. PLEG - Pod生命周期事件
+3. kubelet本身设置的执行周期，监控检测
+4. 定时的清理事件
+
+
+
+SyncLoop：
+
+1. Woker接收到相应的事件，完成指定的某项具体工作
+
+
+
+### 4-9 Pod创建启动流程
+
+![](.\pic\Pod启动.png)
+
+
+
+### 4-10 Master的高可用
+
+apiserver高可用
+
+	1. 无状态，部署多个实例
+	1. 通过负载均衡器或者网关服务对外统一提供服务
+
+controller-manager和scheduler高可用
+
+	1. 本地并没有保存持久化数据，部署多个实例
+	1. 实例向apiserver中的`Endpoint`加锁来进行leader election
+
+etcd高可用
+
+1. mysql是主从同步。从库异常，不影响使用。主库异常，主库下线，最新数据的从库变主库。对外访问，通过代理服务，或通过vip+keepalive，或通过MHA完成监控和切换
+2. redis是主从+哨兵。
+3. etcd基于raft实现数据一致性。
+
+
+
+### 4-11 安全机制
+
+1. 认证：判断用户是否是合法的
+   1. 匿名认证：默认关闭
+   2. 白名单认证：basic配置文件
+   3. token认证：涉及集群和pod操作
+   4. X509证书：组件间默认
+2. 鉴权：判断API是否是合法的
+   1. Always：不需要鉴权
+   2. ABAC：属性控制
+   3. RBAC：角色控制
+   4. Node：kubectl发出的请求
+   5. Webhook：第哦啊有外部Rest鉴权
+3. 准入控制：对请求的资源对象执行自定义操作
+
+
+
+RBAC
+
+	1. 角色与权限关联
+	1. 用户成为角色，而得到权限
+	1. 普通角色，集群角色
+	1. 参考资料：https://mp.weixin.qq.com/s/T2QGLlKwjaUByDtGFL94PQ
+
+
+
+### 5-2 k8s集群
+
+1. 模式一：自己买云服务器，自己安装k8s集群
+2. 模式二：自己买k8s集群，会创建节点
+3. 模式三：自己买k8s集群，节点自动托管的
+
+
+
+### 5-3 安装k8s集群
+
+```
+# 安装k8s集群
+需要采购两台香港地域2核4G云主机
+## 操作系统
+cenos9.0
+## docker源配置
+yum-config-manager --add-repo   https://download.docker.com/linux/centos/docker-ce.repo
+## kubernetes源
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+## 安装docker
+yum -y install docker-ce
+systemctl start docker -- 启动docker
+systemctl enable docker -- 开机自启动docker
+docker version -- docker版本查看,20.10.21
+docker images -- 镜像查看
+## 安装k8s组件
+-- yum -y install kubeadm-1.25.4 kubelet-1.25.4 kubectl-1.25.4 -- 这个最新的版本有bug？？？
+yum -y install kubeadm-1.21.3 kubelet-1.21.3 kubectl-1.21.3
+## 开机启动docker和k8s服务
+systemctl enable docker.service
+systemctl enable kubelet.service
+## 启动容器运行时 containerd
+mv /etc/containerd/config.toml /etc/containerd/config.bak
+containerd config default | sudo tee /etc/containerd/config.toml
+systemctl restart containerd -- 重启
+## 安装k8s,我们知道k8s的主机角色分为master、worknode，创建k8s集群首先需要初始化k8s的master节点。
+kubeadm init --apiserver-advertise-address=172.19.255.10 --kubernetes-version v1.25.4 --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+-- 不加上指定的机器IP和版本号:
+kubeadm init --service-cidr=10.96.0.0/12 --pod-network-cidr=10.244.0.0/16
+mkdir -p ~/.kube
+cp -i /etc/kubernetes/admin.conf ~/.kube/config
+chown $(id -u):$(id -g) ~/.kube/config
+## 初始化worknode节点(work节点)
+kubeadm reset -- 第二次连接的时候，需要做一次reset
+kubeadm join 172.19.255.10:6443 --token ef9uye.ksy025pzhs9y33yi --discovery-token-ca-cert-hash sha256:af64e43b6a3623c0514c98ff786d7a9b7e600c980ca8096881c6b6d93596a0bf
+## 查看集群(master节点)
+kubectl get node
+## 安装flannel(master节点)
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+## 查看k8s集群的信息(master节点)
+yum install -y *rhsm*
+kubectl get pods -n kube-system
+kubectl logs -n kube-system etcd-vm-255-7-centos
+```
+
+
+
+### 5-4 服务伸缩原理
+
+1. HPA
+   1. 调整pod的副本数量
+   2. 无状态服务，负载波动较大的情况下，推荐使用
+   3. 依赖metrics-server组件来收集pod的运行指标
+   4. 只支持cpu、内存这两类指标
+2. VPA
+   1. 调整单个pod的资源限额
+   2. 更加适合于大型计算类服务
+   3. 需要单独安装CA-controller组件，依赖pod的历史负载指标
+3. CA
+   1. 调整k8s集群的工作节点数量
+
+实践：
+
+1. 智能HPA
+2. 定时HPA
+
+
+
+### 7-10 grpc参数
+
+服务端参数：
+
+![](.\pic\grpc_server_params.png)
+
+客户端参数：
+
+![](.\pic\grpc_client_params.png)
+
+
+
+### 7-11 grpc问题
+
+错误处理：根据code
+
+![](.\pic\grpc_code.png)
+
+
+
+### 7-12 缓存问题
+
+读服务：
+
+1. 读取缓存
+2. 缓存不存在，读取数据库
+3. 更新缓存
+
+写服务：
+
+1. 删除缓存
+2. 更新数据库
+3. 删除缓存
+
+收益：
+
+1. 提升性能
+2. 提升系统稳定度
+3. 减少外部依赖
+
+风险：
+
+1. 提高系统复杂度
+2. 数据一致性保证
+
+
+
+### 8-2 grpc连接池
+
+1. 使用sync.Pool，内部是双向循环队列，无锁，通过原子对比更新操作实现
+2. grpc单连接本身支持万级并发
+
+
+
+### 8-3 grpc反射
+
+1. 服务端添加：reflection.Register(s)
+2. 安装grpctrl
+3. 常见调用命令
+
+```
+# 使用gRPC服务
+grpcurl -plaintext localhost:80 list
+grpcurl -plaintext localhost:80 describe
+# 使用proto文件
+grpcurl -import-path ./ -proto user_growth.proto list
+# 使用protoset文件
+grpcurl -protoset myservice.protoset list UserGrowth.UserCoin
+# 调用gRPC服务
+grpcurl -plaintext localhost:80 UserGrowth.UserCoin/ListTasks
+grpcurl -plaintext -d '{"uid":1}' localhost:80 UserGrowth.UserCoin/UserCoinInfo
+```
+
+
+
+### 8-4 grpc转http:gin
+
+```
+	conn, err := grpc.Dial("localhost:80", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+	clientGrade := pb.NewUserGradeClient(conn)
+	router := gin.New()
+	router.GET("/hello", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "hello")
+	})
+	v1Group := router.Group("/v1", func(ctx *gin.Context) {
+		origin := ctx.GetHeader("Origin")
+		if AllowOrigin[origin] {
+			ctx.Header("Access-Control-Allow-Origin", origin)
+			ctx.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTION")
+			ctx.Header("Access-Control-Allow-Headers", "*")
+			ctx.Header("Access-Control-Allow-Credentials", "true")
+		}
+		ctx.Next()
+	})
+	gUserCoin := v1Group.Group("/UserGrowth.UserCoin")
+	gUserCoin.GET("/ListTasks", func(ctx *gin.Context) {
+		out, err := clientCoin.ListTasks(ctx, &pb.ListTasksRequest{})
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"code":    2,
+				"message": err.Error(),
+			})
+		} else {
+			ctx.JSON(http.StatusOK, out)
+		}
+	})
+	h2Handler := h2c.NewHandler(router, &http2.Server{})
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: h2Handler,
+	}
+	server.ListenAndServe()
+```
+
+
+
+### 8-5 grpc转http:grpc-gateway
+
+![](.\pic\gateway.png)
+
+```
+protoc -I . --grpc-gateway_out ./ \
+    --grpc-gateway_opt logtostderr=true \
+    --grpc-gateway_opt paths=source_relative \
+    --grpc-gateway_opt generate_unbound_methods=true \
+    user_growth.proto
+```
+
+```
+	s := grpc.NewServer()
+	pb.RegisterUserGradeServer(s, &ugserver.UgGradeServer{})
+	reflection.Register(s)
+	serveMuxOpt := []runtime.ServeMuxOption{
+		runtime.WithOutgoingHeaderMatcher(func(s string) (string, bool) {
+			return s, true
+		}),
+		runtime.WithMetadata(func(ctx context.Context, request *http.Request) metadata.MD {
+			origin := request.Header.Get("Origin")
+			if AllowOrigin[origin] {
+				md := metadata.New(map[string]string{
+					"Access-Control-Allow-Origin":      origin,
+					"Access-Control-Allow-Methods":     "GET,POST,PUT,DELETE,OPTION",
+					"Access-Control-Allow-Headers":     "*",
+					"Access-Control-Allow-Credentials": "true",
+				})
+				grpc.SetHeader(ctx, md)
+			}
+			return nil
+		}),
+	}
+	mux := runtime.NewServeMux(serveMuxOpt...)
+	ctx := context.Background()
+	if err := pb.RegisterUserGradeHandlerServer(ctx, mux, &ugserver.UgGradeServer{}); err != nil {
+		log.Printf("Faile to RegisterUserGradeHandlerServer error=%v", err)
+	}
+	httpMux := http.NewServeMux()
+	httpMux.Handle("/v1/UserGrowth", mux)
+	server := &http.Server{
+		Addr: ":8081",
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("http.HandlerFunc url=%s", r.URL)
+			mux.ServeHTTP(w, r)
+		}),
+	}
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("ListenAndServe error=%v", err)
+	}
+```
+
+
+
+### 8-6 跨域问题
+
+1. 跨域，浏览器为了安全做的限制
+2. 请求资源域名或端口不一致时出现
+3. 用CORS解决，相应头中增加几个Access-Control-Allow-XXX
+
+
+
+### 8-9 接口幂等性
+
+​	接口幂等性
+
+	1. 同个接口，多次发出同个请求，保证只执行一次
+	1. 调用方调用失败是常态，失败后会有重试
+
+
+
+​	幂等性场景
+
+1. 查询，天然幂等
+2. 常量赋值，幂等
+3. 变量赋值，可能
+
+
+
+​	实现
+
+1. 乐观锁
+   1. 数据库增加version字段
+   2. 先获取version
+   3. 更新时对比version，相同才更新
+   4. 存在ABA问题
+2. 悲观锁
+   1. 获取数据时加锁：For Update
+3. 数据库唯一性索引
+4. 分布式锁
+5. token
+   1. 每次操作生成唯一凭证
+
+
+
+### 9-2 服务发现和负载均衡原理
+
+​	服务注册
+
+![](.\pic\服务注册.png)
+
+​	服务发现
+
+![](.\pic\服务发现.png)
+
+​	负载均衡
+
+![](.\pic\负载均衡.png)
+
+
+
+### 9-2 grpc负载均衡失效
+
+原因
+
+	1. grpc客户端只建立了一个连接
+	1. 通过ClusterIp负载均衡连接到一个Pod上
+	1. 因此每次请求都只转发到一个Pod上
+
+解决1：客户端建立grpc连接池
+
+解决2：引入服务网关
+
+解决3：Handless，访问服务名.命名空间.svc.cluster.local可以获取全部的Pod Ip，做负载均衡
+
+、
+
+### 9-4 集群内服务调用
+
+1. 服务名的域名->DNS域名解析->ClusterIp
+2. NodeIp,ClusterIp,PodIp
+
+
+
+### 9-7 K8s网络
+
+![](.\pic\nat1.png)
+
+1. 过程：
+
+   1. 客户端Pod调用CoreDNS服务，得到ClusterIP
+
+   2. 客户端Pod发起网络连接到ClusterIP
+
+      1. kubeProxy代理
+      2. iptables
+      3. ipvs
+
+   3. 客户端Pod的网络连接，经过客户端节点的iptables/IPVS规则处理，转发到服务端PodIP
+
+   4. 客户端Pod通过客户端节点的网络与服务端节点上的Pod建立网络连接，完成服务的网络调用
+
+      
+
+iptables原理：
+
+![](.\pic\iptables1.png)
+
+1. filter： 过滤： INPUT, FORWARD, OUTPUT
+2. nat： PREROUTING (DNAT做目标地址转换）, OUTPUT, POSTROUTING(SNAT, 目标地址转换)
+3. mangle： 拆解报文， 全部位置
+4. raw： 连接追踪， PREROUTING, OUTPUT
+
+
+
+ipvs原理：
+
+1. 使用ipset替换了iptables部分功能，简化管理
+2. 创建kube-ipvs0网卡，将所有的ClusterIP绑定到该网卡
+3. 为Service和EndPoints创建ipvs的虚拟服务和真实服务
+
+
+
+lvs原理：
+
+![](.\pic\lvs.png)
+
+NAT模式
+
+1. 请求及响应的数据包都需要经过VIP服务器转发，数据报头的修改
+2. 内部的私有IP地址可以访问外网
+3. 外部可以访问位于内部的私有IP主机
+
+
+
+TUN模式
+
+1. 将原始数据包封装并添加新的包头
+
+2. 将一个目标为调度器的VIP地址的数据包封装
+
+3. 通过隧道转发给后端的真实服务器
+
+4. 真实服务器在收到请求数据包后直接给客户端主机响应数据
+
+   ![](.\pic\lvs_tun.png)
+
+
+
+DR模式
+
+1. 调度器与后端服务器必须在同一个局域网内
+2. 真实服务器给客户端回应数据包时需要设置源IP为VIP地址，目标IP为客户端IP
+
+
+
+### 10-4 集群外访问-Service_NodePort
+
+![](.\pic\NodePort.png)
+
+1. NodeIp+NodePort -> PodIp+PodPort
+2. 不需要使用ClusterIp
+3. NodePort集群内唯一 
+
+
+
+问题：
+
+1. NodePort端口有限，共2000多个，且需要自己维护
+2. NodeIp，因为节点上下线，导致变化或不可用
+3. 当前NodeIp可能没部署对应Pod，需要再次转发
+
+
+
+使用场景：
+
+1. 自定义特殊网络协议，无法使用Ingress代理转发
+2. 节点稳定
+
+
+
+### 10-5 集群外访问-LoadBalancer
+
+问题：
+
+1. 每个service需要一个LB
+2. 需要设备支持
+3. 需要云厂商提供
+
+
+
+### 10-6 集群外访问-Ingress
+
+1. 需要一个NodePort或者一个LB，暴露多个Service
+2. 7层的负载均衡器
+3. Ingress里建立诸多映射规则
+4. Ingress Controller通过监听配置规则并转成Nginx配置，对外部提供服务
+
+
+
+核心对象：
+
+1. Ingress：定义请求转发到service的规则
+2. ingress controller：具体实现反向代理及负载均衡的程序，对ingress的规则解析，请求转发，nginx实现
+
+
+
+工作原理：
+
+1. 用户编写ingress规则，说明哪个域名对应kubernetes集群中的哪个service
+2. Ingress控制器动态感知Ingress服务规则的变化，然后生成一段对应的Nginx反向代理配置
+3. Ingress控制器会将生成的Nginx配置写入到一个运行着的Nginx服务中，并动态更新
+4. 其实真正在工作的就是一个Nginx了，内部配置了用户定义的请求转发规则
+
+
+
+![](.\pic\ingress1.png)
+
+
+
+步骤：
+
+1. 安装nginx Ingress组件，就是一个ingress controller
+2. 创建nginx Ingress实例
+3. 新建ingress规则，支持http，https(（grpc，需要ssl证书，证书加入secure，ingress配置中支持grpc），域名，对应的service和端口
+4. 启动ingress实例，选择ingress controller，会有一个vip
+
+
+
+### 11-2 Helm安装
+
+官方文档：https://helm.sh/zh/docs/
+
+客户端：https://helm.sh/zh/docs/intro/install/
+
+Helm Client -> http -> ApiServer
+
+安装方式：
+
+1. 脚本
+
+   ```
+   curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+   chmod 700 get_helm.sh
+   ./get_helm.sh
+   ```
+
+2. 包管理器
+
+3. 源码
+
+
+
+### 11-3 Helm常用命令
+
+```
+helm version
+helm help
+helm create usergrowth
+helm package usergrowth 
+helm template usergrowth-0.1.0.tgz
+helm install usergrowth usergrowth/
+helm uninstall usergrowth
+```
+
+1. 创建项目：helm create xxx
+
+2. 修改配置信息：values.yaml
+
+3. 修改模板文件：templates/*.yaml
+
+4. k8s集群开放访问权限，让apiserver能被访问
+
+5. helm客户端机器，创建文件：~/.kube/config，把开放内网权限配置写入
+
+6. 访问集群：
+
+   ```
+   kubectl config get-contexts
+   kubectl config use-context cls-xxx
+   ```
+
+7. 镜像密钥下发
+
+8. 执行安装：helm install xxx xxx/
+
+9. 执行升级：helm upgrade xxx xxx/
+
+
+
+### 12-2 ServiceMesh
+
+服务网格：
+
+1. 分离和管理服务间通讯
+2. 服务发现，负载均衡，加密
+
+
+
+### 12-3 Istio
+
+![](.\pic\istio.png)
+
+流量管理：
+
+1. 服务发现
+2. 负载均衡
+3. 服务治理
+   1. 故障注入
+   2. 超时控制
+   3. 重试
+   4. 熔断
+   5. 限流
+4. 多版本流量控制
+
+可观测性：
+
+1. 指标监控
+   1. 延迟、流量、错误、饱和
+2. 日志
+3. 链路追踪
+
+安全能力：
+
+1. TLS加密
+2. 身份验证
+3. 授权审计
+
+
+
+注入过程：
+
+1. 自动注入：使用 Istio Sidecar Injector。会拦截所有 Pod 创建请求并自动注入 Envoy Sidecar。
+2. 手动注入：修改应用程序或 Deployment 的 YAML 文件手动注入 Envoy Sidecar
+
+
+
+接管过程：
+
+1. 注入 Envoy Sidecar：将 `istio-init` 容器注入到 Pod 中来初始化 Envoy Sidecar。`istio-init` 容器会修改 Pod 的网络配置，以将所有网络流量重定向到 Envoy Sidecar。
+2. 配置 Envoy：Envoy Sidecar将自动连接到 Istio 控制平面并获取路由配置、服务发现等信息。自动配置路由规则、负载均衡策略等。
+3. 网络流量处理：当 Pod 接收到请求时，请求将被发送到 Envoy Sidecar。根据路由规则和负载均衡策略，将请求转发给正确的目标服务或 Sidecar。
+4. 代理流量：在流量到达目标服务或 Sidecar 之前，它会经过一系列 Envoy Sidecar 的过滤器和插件。
+5. 监控和日志：Envoy Sidecar 还可以收集和发送各种度量和日志数据。
+
+
+
+### 13-2 Prometheus
+
+![](.\pic\promethrus.png)
+
+
+
+### 13-3 Grafana
+
+自定义数据源：
+
+![](.\pic\grafana_1.png)
+
+
+
+### 13-4 日志服务
+
+![](.\pic\cls.png)
+
+
+
+### 13-5 云原生
+
+架构：模块化，可观测，可部署，可测试，可替换
+
+服务：弹性伸缩，动态调度，资源利用率高，高可用
+
+
+
+### 14-2 AlertManager
+
+![](.\pic\altermanager.png)
+
+1. prumetheus配置文件增加alertManager的服务端
+2. prumetheus配置文件增加指标规则条件
+3. alterManager配置文件增加发送方式
+
+
+
+### 14-5 prometheus采集k8s集群
+
+1. 增加k8s集群资源访问权限文件
+2. 增加prometheus的service和deployment配置文件，使用账号为第一步的账号
+3. 增加业务模块的service和deployment配置文件，增加prometheus.io/port和prometheus.io/scrape
+4. prometheus服务本身的配置文件，增加节点和模块的动态服务发现采集配置
+
+
+
+### 14-6 AlertManager自定义告警
+
+1. 开发一个服务，实现POST /alert接口
+2. alertmanager配置文件，增加一个web.hook，配置上面的地址
+
+
+
+### 15-2 压力测试
+
+1. 发现瓶颈
+2. 验证可伸缩性
+3. 确保可靠性
+4. 改善用户体验
+5. 满足业务目标
+
+
+
+### 15-3 wrk压测
+
+```
+    -c, --connections <N>  连接数(并发的协程，如：-c10)
+    -d, --duration    <T>  持续时间(压测时间，如：-d10s)
+    -t, --threads     <N>  线程数(操作系统的线程数，如：-t2)
+                                                      
+    -s, --script      <S>  加载lua文件(如：-s post.lua)
+    -H, --header      <H>  增加请求中的header信息(如：-H 'host:yifan-online.com')    
+        --latency          打印延迟直方图信息
+        --timeout     <T>  请求超时时间(如: --timeout=1s)
+    -v, --version          Print version details
+```
+
+
+
+### 15-4 wrk报告
+
+```
+Running 10s test @ http://localhost:8080/hello
+2 threads and 10 connections （2个线程，10个连接）
+Thread Stats   Avg(均值)      Stdev(标准差)     Max(最大值)   +/- Stdev(正负标准差值)
+Latency(延迟)    12.86ms   40.43ms 355.84ms   91.08%
+Req/Sec(每个线程每秒请求数)     8.31k    10.25k   43.79k    86.46%
+Latency Distribution
+50%  756.00us(50%请求延迟在756.00us内)
+75%    0.94ms(75%请求延迟在0.94ms内)
+90%   44.01ms(90%请求延迟在44.01ms内)
+99%  227.47ms(99%请求延迟在227.47ms内)
+164170 requests in 10.02s, 18.94MB read(共164170次请求，用时10。02s，传输了18.94M数据)
+Requests/sec(每秒请求数):  16388.14
+Transfer/sec(每秒传输数据):      1.89MB
+```
+
+标准差：91.08%的请求在12.86-40.43到12.86+40.43之间
